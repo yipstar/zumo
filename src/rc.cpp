@@ -9,7 +9,7 @@
 #include "qpn.h"
 #include "app.h"
 
-//#define RC_DEBUG 1
+#define RC_DEBUG 1
 #include "log.h"
 
 enum RC_Mode {
@@ -31,6 +31,7 @@ static QState RC_manual_good(RC * const me);
 static QState RC_manual_nogood(RC * const me);
 
 static QState RC_auto(RC * const me);
+static QState RC_auto_object_detected(RC * const me);
 
 RC AO_RC;
 void RC_ctor(void) {
@@ -62,14 +63,14 @@ RC_Mode getMode() {
   // subtract 1500 to get a value centered on 0
   modeIn -= 1500;
 
-  RC_PRINT("modeIn: ");
-  RC_PRINTLN(modeIn);
+  /*RC_PRINT("modeIn: ");
+  RC_PRINTLN(modeIn);*/
 
   if (modeIn < -500) {
     mode = RC_MODE_MANUAL;
   }
 
-  if (modeIn > 475) {
+  if (modeIn > 470) {
     mode = RC_MODE_AUTO;
   }
 
@@ -84,23 +85,36 @@ static QState RC_top(RC * const me) {
   switch (Q_SIG(me)) {
 
     case Q_ENTRY_SIG: {
-      RC_PRINTLN("RC_top");
+      /*RC_PRINTLN("RC_top");*/
       return Q_HANDLED();
     }
 
     case Q_TIMEOUT_SIG: {
+      Serial.println("RC_top: timeout");
 
       auto mode = getMode();
       if (mode == RC_MODE_MANUAL) {
-        return Q_TRAN(&RC_manual_nogood);
+        /*return Q_TRAN(&RC_manual_nogood);*/
       }
 
       if (mode == RC_MODE_AUTO) {
-        return Q_TRAN(&RC_auto);
+        /*return Q_TRAN(&RC_auto);*/
+
       }
 
       return Q_HANDLED();
     }
+
+    case OBJECT_DETECTED_SIG: {
+      Serial.println("RC_top: object detected, do nothing");
+      return Q_HANDLED();
+    }
+
+    case OBJECT_CLEAR_SIG: {
+      Serial.println("RC_top: object clear, do nothing");
+      return Q_HANDLED();
+    }
+
   }
 
   return Q_SUPER(&QHsm_top);
@@ -121,7 +135,7 @@ static QState RC_manual_good(RC * const me) {
         return Q_TRAN(&RC_top);
       }
 
-      RC_PRINTLN("read data");
+      /*RC_PRINTLN("read data");*/
 
       int throttle = pulseIn(THROTTLE_PIN, HIGH);
       int steering = pulseIn(STEERING_PIN, HIGH);
@@ -138,7 +152,9 @@ static QState RC_manual_good(RC * const me) {
     case Q_EXIT_SIG: {
       RC_PRINTLN("RC_manual_good EXIT");
       ZumoMotors::setSpeeds(0, 0);
+      return Q_HANDLED();
     }
+
   }
 
   return Q_SUPER(&RC_top);
@@ -180,16 +196,62 @@ static QState RC_auto(RC * const me) {
     }
 
     case Q_TIMEOUT_SIG: {
+      /*RC_PRINLN("RC_auto: timeout");*/
+
       auto mode = getMode();
       if (mode != RC_MODE_AUTO) {
         return Q_TRAN(&RC_top);
       }
 
+      int forwardSpeed = 80;
+      ZumoMotors::setSpeeds(forwardSpeed, forwardSpeed);
+
+      return Q_HANDLED();
+    }
+
+    case OBJECT_DETECTED_SIG: {
+      Serial.println("RC_auto object_detected");
+      return Q_TRAN(&RC_auto_object_detected);
+    }
+
+    case Q_EXIT_SIG: {
+      RC_PRINTLN("RC_auto EXIT");
+      ZumoMotors::setSpeeds(0, 0);
       return Q_HANDLED();
     }
   }
 
   return Q_SUPER(&RC_top);
+}
+
+static QState RC_auto_object_detected(RC * const me) {
+
+  switch (Q_SIG(me)) {
+
+    case Q_ENTRY_SIG: {
+      RC_PRINTLN("RC_auto_object_detected ENTRY");
+      return Q_HANDLED();
+    }
+
+    case Q_TIMEOUT_SIG: {
+      RC_PRINTLN("RC_auto_object_detected timeout");
+
+      ZumoMotors::setSpeeds(0, 0);
+      return Q_HANDLED();
+    }
+
+    case OBJECT_DETECTED_SIG: {
+      // do nothing with this message
+      return Q_HANDLED();
+    }
+
+    case OBJECT_CLEAR_SIG: {
+      Serial.println("RC_auto_object_detected: object clear");
+      return Q_TRAN(&RC_auto);
+    }
+  }
+
+  return Q_SUPER(&RC_auto);
 }
 
 void doManual(int throttle, int steering) {

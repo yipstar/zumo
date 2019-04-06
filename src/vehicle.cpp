@@ -13,8 +13,11 @@ typedef struct Vehicle {
 
 // forward declare state handlers
 static QState Vehicle_initial(Vehicle * const me);
+
 static QState Vehicle_off(Vehicle * const me);
 static QState Vehicle_on(Vehicle * const me);
+
+static QState Vehicle_disarmed(Vehicle * const me);
 
 Vehicle AO_Vehicle;
 
@@ -25,63 +28,64 @@ void Vehicle_ctor(void) {
 }
 
 QState Vehicle_initial(Vehicle * const me) {
-  QActive_armX((QActive *)me, 0U,
-               BSP_TICKS_PER_SEC/2U, BSP_TICKS_PER_SEC/2U);
+  /*QActive_armX((QActive *)me, 0U,
+               BSP_TICKS_PER_SEC/2U, BSP_TICKS_PER_SEC/2U);*/
 
-  return Q_TRAN(&Vehicle_off);
+  return Q_TRAN(&Vehicle_disarmed);
 }
 
-static QState Vehicle_off(Vehicle * const me) {
-  QState status_;
+static QState Vehicle_disarmed(Vehicle * const me) {
 
   switch (Q_SIG(me)) {
 
-  case Q_ENTRY_SIG: {
-    Serial.println("Vehicle_off");
-    digitalWrite(LED_L, LOW);
-    status_ = Q_HANDLED();
-    break;
+    case Q_ENTRY_SIG: {
+      Serial.println("Vehicle_disarmed");
+      /*digitalWrite(LED_L, LOW);*/
+      return Q_HANDLED();
+    }
+
+    case Q_TIMEOUT_SIG: {
+      /*Serial.println("Vehicle_off timeout");*/
+      return Q_TRAN(&Vehicle_on);
+    }
   }
 
-  case Q_TIMEOUT_SIG: {
-    status_ = Q_TRAN(&Vehicle_on);
-    break;
+}
+
+static QState Vehicle_off(Vehicle * const me) {
+
+  switch (Q_SIG(me)) {
+
+    case Q_ENTRY_SIG: {
+      /*Serial.println("Vehicle_off");*/
+      digitalWrite(LED_L, LOW);
+      return Q_HANDLED();
+    }
+
+    case Q_TIMEOUT_SIG: {
+      /*Serial.println("Vehicle_off timeout");*/
+      return Q_TRAN(&Vehicle_on);
+    }
   }
 
-  default: {
-    status_ = Q_SUPER(&QHsm_top);
-    break;
-  }
-
-  }
-
-  return status_;
+  return Q_SUPER(&QHsm_top);
 }
 
 static QState Vehicle_on(Vehicle * const me) {
 
-  QState status_;
-
   switch (Q_SIG(me)) {
 
-  case Q_ENTRY_SIG: {
-    Serial.println("Vehicle_on");
-    digitalWrite(LED_L, HIGH);
-    status_ = Q_HANDLED();
-    break;
+    case Q_ENTRY_SIG: {
+ /*     Serial.println("Vehicle_on");*/
+      digitalWrite(LED_L, HIGH);
+      return Q_HANDLED();
+    }
+
+    case Q_TIMEOUT_SIG: {
+      /*Serial.println("Vehicle_on timeout");*/
+      return Q_TRAN(&Vehicle_off);
+    }
   }
 
-  case Q_TIMEOUT_SIG: {
-    status_ = Q_TRAN(&Vehicle_off);
-    break;
-  }
-
-  default: {
-    status_ = Q_SUPER(&QHsm_top);
-    break;
-  }
-
-  }
-
-  return status_;
+  return Q_SUPER(&QHsm_top);
 }

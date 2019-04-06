@@ -18,16 +18,25 @@ enum {
     MODE_PIN = 11,
     THROTTLE_PIN = 4,
     STEERING_PIN = 5,
+    DIST_PIN = A3,
     PULSE_WIDTH_DEADBAND = 25, // pulse width difference from 1500 us (microseconds) to ignore (to compensate for control centering offset)
     PULSE_WIDTH_RANGE = 350, // pulse width difference from 1500 us to be treated as full scale input (for example, a value of 350 means any pulse width <= 1150 us or >= 1850 us is considered full scale)
     MAX_SPEED = 400 // max motor speed
 };
 
-extern struct Vehicle AO_Vehicle;
-extern struct RC AO_RC;
+enum AppSignals {
+  OBJECT_DETECTED_SIG = Q_USER_SIG,
+  OBJECT_CLEAR_SIG
+};
 
+extern struct Vehicle AO_Vehicle;
 void Vehicle_ctor(void);
+
+extern struct RC AO_RC;
 void RC_ctor(void);
+
+extern struct Distance AO_Distance;
+void Distance_ctor(void);
 
 // log facility experiments
 //enum eLogSubSystem {
